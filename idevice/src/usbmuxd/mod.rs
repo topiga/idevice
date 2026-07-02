@@ -26,6 +26,9 @@ use errors::UsbmuxdError;
 mod des;
 pub mod errors;
 mod raw_packet;
+pub mod server;
+
+pub use raw_packet::RawPacket;
 
 /// Represents the connection type of a device
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -330,6 +333,25 @@ impl UsbmuxdConnection {
             Some(0) => Ok(()),
             _ => Err(IdeviceError::UnexpectedResponse(
                 "SavePairRecord did not return success".into(),
+            )),
+        }
+    }
+
+    /// Tells usbmuxd to delete the pairing record from its storage
+    ///
+    /// # Arguments
+    /// * `udid` - the device UDID/serial (`PairRecordID`)
+    pub async fn delete_pair_record(&mut self, udid: &str) -> Result<(), IdeviceError> {
+        let req = crate::plist!(dict {
+            "MessageType": "DeletePairRecord",
+            "PairRecordID": udid,
+        });
+        self.write_plist(req).await?;
+        let res = self.read_plist().await?;
+        match res.get("Number").and_then(|x| x.as_unsigned_integer()) {
+            Some(0) => Ok(()),
+            _ => Err(IdeviceError::UnexpectedResponse(
+                "DeletePairRecord did not return success".into(),
             )),
         }
     }
